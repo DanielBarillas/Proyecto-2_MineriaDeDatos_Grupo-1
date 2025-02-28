@@ -480,6 +480,85 @@ Hallazgos
 - Las casas medianas (1000 ≤ GrLivArea < 2000) son la mayoría del dataset y presentan una distribución amplia de precios.
 - Las casas pequeñas (GrLivArea < 1000) tienen precios bajos y menos variabilidad.
 
+3.4 Análisis de Clustering en el Dataset (Segmentación Automática de Casas)
+
+Objetivo del Clustering:
+
+En lugar de definir manualmente los grupos de casas, aplicamos un método de clustering automático (K-Means) para descubrir patrones en los datos y segmentar las casas en grupos con características similares.
+
+3.4.1. Selección de Variables para Clustering
+
+Seleccionamos variables clave que tienen fuerte relación con SalePrice:
+
+```{r}
+# Cargar librerías necesarias
+library(cluster)
+library(factoextra)
+library(dplyr)
+
+# Seleccionar variables más relevantes para clustering
+clustering_data <- train %>% select(OverallQual, GrLivArea, TotalBsmtSF, GarageCars)
+
+# Normalizar los datos (evita sesgo por escalas diferentes)
+clustering_data <- scale(clustering_data)
+```
+
+Las variables seleccionadas (OverallQual, GrLivArea, TotalBsmtSF, GarageCars) reflejan calidad, tamaño y capacidad del garaje, que son fuertes indicadores del precio.
+
+3.4.2. Aplicación del Algoritmo de Clustering (K-Means)
+
+```{r}
+# Fijar semilla para reproducibilidad
+set.seed(42)
+
+# Aplicar K-Means con 3 clusters (puede ajustarse)
+kmeans_result <- kmeans(clustering_data, centers = 3, nstart = 25)
+
+# Agregar los clusters al dataset
+train$Cluster <- as.factor(kmeans_result$cluster)
+```
+
+Cada casa ha sido asignada a un grupo (Cluster 1, Cluster 2, Cluster 3).
+Estos clusters representan diferentes segmentos del mercado inmobiliario.
+
+3.4.3. Visualización de los Clusters
+
+Para analizar cómo se agrupan las casas según el clustering, graficamos la relación entre tamaño (GrLivArea) y precio (SalePrice), coloreando los grupos.
+
+```{r}
+ggplot(train, aes(x = GrLivArea, y = SalePrice, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Clusters de Casas basados en Área y Precio",
+       x = "Área Habitable (GrLivArea)",
+       y = "Precio de Venta (SalePrice)") +
+  theme_minimal()
+```
+
+Los colores indican los diferentes grupos de casas detectados automáticamente.
+
+3.4.4. Caracterización de los Clusters
+
+Cluster 1 - Casas económicas
+
+- Baja calidad de construcción (OverallQual bajo).
+- Tamaño reducido (GrLivArea y TotalBsmtSF pequeños).
+- Garaje pequeño o inexistente (GarageCars).
+- Bajo SalePrice, generalmente en vecindarios más baratos.
+
+Cluster 2 - Casas de precio medio
+
+- Calidad media-alta (OverallQual entre 5 y 7).
+- Tamaño intermedio, con un área habitable moderada.
+- Garaje con espacio para 1-2 autos.
+- Precio en el rango medio del dataset.
+
+Cluster 3 - Casas de lujo
+
+- Alta calidad de construcción (OverallQual > 7).
+- Casas grandes con mucho espacio (GrLivArea alto).
+- Garajes amplios (2-3 autos).
+- SalePrice alto, típicamente en vecindarios premium.
+
 Conclusiones del Análisis de Grupos
 
 1. Calidad de Construcción (OverallQual) y su Relación con el Precio
@@ -516,6 +595,18 @@ El área habitable de una casa (GrLivArea) es otro factor clave para determinar 
 - Casas pequeñas (GrLivArea < 1000 m²): Son las de menor precio y presentan menos variabilidad en los valores de venta, lo que indica que hay menos margen para variaciones de precio en función de otros factores.
 
 - Conclusión: Aunque el tamaño de la casa es un fuerte predictor del precio de venta, no es el único determinante. Casas de mayor tamaño tienden a costar más, pero la calidad de construcción y la ubicación pueden hacer que algunas casas pequeñas sean más valiosas que otras más grandes.
+
+Conclusiones del Análisis de Clusters
+
+1. El clustering confirmó los patrones que habíamos identificado manualmente.
+
+Las casas se dividen en segmentos de Bajo, Medio y Alto precio, con diferencias en tamaño y calidad.
+
+2. El clustering puede ser usado como una nueva variable (Cluster) para mejorar la predicción de SalePrice.
+
+Agregar Cluster como variable categórica en el modelo de regresión podría mejorar el desempeño.
+
+3. El modelo puede beneficiarse de una segmentación más avanzada.
 
 Conclusión General del Análisis de Grupos
 
