@@ -559,7 +559,83 @@ Cluster 3 - Casas de lujo
 - Garajes amplios (2-3 autos).
 - SalePrice alto, típicamente en vecindarios premium.
 
-Conclusiones del Análisis de Grupos
+Gráfica Agrupada por cluster...
+
+```{r}
+# Cargar librerías necesarias
+library(factoextra)
+library(cluster)
+library(dplyr)  # Cargar dplyr
+
+# Seleccionar variables para clustering
+clustering_data <- train %>% select(OverallQual, GrLivArea, TotalBsmtSF, GarageCars)
+
+# Normalizar los datos (evita sesgo por escalas diferentes)
+clustering_data <- scale(clustering_data)
+
+# Aplicar K-Means con 3 clusters
+set.seed(42)  # Asegurar reproducibilidad
+kmeans_result <- kmeans(clustering_data, centers = 3, nstart = 25)
+
+# Agregar clusters al dataset
+train$Cluster <- as.factor(kmeans_result$cluster)
+
+# Visualizar los clusters
+fviz_cluster(kmeans_result, data = clustering_data,
+             geom = "point", ellipse.type = "norm",
+             palette = c("red", "blue", "green"),
+             ggtheme = theme_minimal(),
+             main = "Cluster plot")
+```
+Conclusiones del Análisis de Clustering
+
+El gráfico de clustering muestra tres grupos diferenciados en el dataset de precios de casas. Basándonos en la distribución y separación de los clusters, se pueden hacer las siguientes observaciones:
+
+1. Interpretación de los Clusters
+
+Cluster 1 (Rojo - Izquierda): Casas de Bajo Precio y Tamaño Pequeño
+
+- Este grupo representa casas con menor calidad de construcción (OverallQual baja), menor área habitable (GrLivArea pequeña) y sótanos más pequeños.
+
+- Muchas de estas casas tienen valores atípicos y precios significativamente más bajos en comparación con el resto del dataset.
+
+- Posible ubicación en vecindarios menos costosos.
+
+Cluster 2 (Azul - Centro): Casas de Precio Medio y Tamaño Promedio
+
+- Representa la mayor parte de las casas del dataset.
+
+- casas tienen una calidad de construcción media y tamaños moderados de área habitable y sótano.
+
+- Su precio está dentro de un rango intermedio y pueden pertenecer a vecindarios de costo medio.
+
+Cluster 3 (Verde - Derecha): Casas de Alto Precio y Gran Tamaño
+
+- Corresponde a casas de gran tamaño, con alta calidad de construcción y amplios sótanos.
+
+- Están en los rangos de precios más altos y probablemente se ubiquen en vecindarios exclusivos.
+
+- Hay una mayor dispersión en este grupo, lo que indica que el precio puede variar significativamente dependiendo de otras características.
+
+2. Hallazgos Clave
+
+- El clustering sugiere que el precio de una casa está fuertemente influenciado por el tamaño y la calidad de la construcción.
+
+- Existen claras diferencias entre los grupos, lo que confirma que segmentar los datos ayuda a comprender mejor el comportamiento del precio de las casas.
+
+- Algunas casas en el Cluster 1 (rojo) están alejadas de su grupo principal, lo que indica posibles valores atípicos o características únicas que afectan su precio.
+
+- El Cluster 3 (verde) muestra una dispersión mayor, lo que implica que en el segmento de casas más costosas, el precio depende de múltiples factores y no solo del tamaño.
+
+3. Implicaciones para la Predicción del Precio
+
+- Segmentar los datos por clusters antes de entrenar un modelo podría mejorar la precisión de la predicción.
+
+- Las casas en el Cluster 1 podrían ser mejor modeladas con características diferentes a las de los Clusters 2 y 3.
+
+- El precio de las casas más caras (Cluster 3) es más variable, lo que sugiere que factores adicionales como ubicación y acabados tienen un impacto significativo.
+
+------------ Conclusiones del Análisis de Grupos ------------
 
 1. Calidad de Construcción (OverallQual) y su Relación con el Precio
 
