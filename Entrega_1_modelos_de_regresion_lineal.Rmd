@@ -1067,6 +1067,91 @@ Este modelo es un punto de partida, pero un modelo multivariable será más prec
 
 ### 8.	Haga un modelo de regresión lineal con todas las variables numéricas para predecir el precio de las casas. Analice el modelo (resumen, residuos, resultados de la predicción). Muestre el modelo gráficamente.
 
+- Lo que vamos a hacer es crear con todos los predictores de train , pero antes vamos a convertirlos a numericas todas.
+
+```{r}
+
+train[] <- lapply(train, function(x) {
+  if (is.factor(x) || is.character(x)) {
+    as.numeric(as.factor(x))
+  } else {
+    x  
+  }
+})
+
+
+head(train)
+
+```
+
+- Miramos la distribucion de SalesPrice
+```{r}
+ggplot(train, aes(x = SalePrice)) + 
+  geom_histogram(bins = 50, fill = "blue", alpha = 0.7) +
+  labs(title = "Distribución de Precios de Casas", x = "Precio de Venta", y = "Frecuencia")
+```
+
+- Aplicamos logaritmo para quitar el sesgo
+```{r}
+train$SalePrice <- log(train$SalePrice)
+ggplot(train, aes(x = SalePrice)) +
+  geom_histogram(bins = 50, fill = "red", alpha = 0.7) +
+  labs(title = "Distribución Logarítmica de los Precios", x = "Log(Precio)", y = "Frecuencia")
+```
+
+
+- Ya con esto creamos nuestro modelo con todas las variables.
+
+```{r}
+library(dplyr)
+train <- train %>% select(-any_of(c("Id", "Cluster")))
+
+
+modelo1 <- lm(SalePrice~.,data = train)
+summary(modelo1)
+```
+
+
+#### Analisis
+
+- Podemos ver que nuestro modelo tiene un R^2 de 0.99 lo que es una muy buena señal de prediccion ya que explica el 99% de los datos.Ademas que el F stadistics indica que es altamente significativo ya que su p value es muy pequeño.
+
+- TotalBsmtSF, GrLivArea, Age estan correlacionadas con otras, y se elimino de este modelo de manera automatica.
+
+- Las variables significativas fueron 
+OverallQual (p < 2e-16, coef. = 0.0006618) → La calidad general de la casa es el predictor más fuerte.
+1stFlrSF (p < 2e-16, coef. = 2.766e-06) → El tamaño del primer piso tiene un efecto positivo importante.
+2ndFlrSF (p < 2e-16, coef. = 2.704e-06) → El área del segundo piso también impacta en el precio.
+Qual_LivArea (p < 2e-16, coef. = -4.112e-07) → Una métrica combinada de calidad y área afecta el precio.
+LotFrontage (p = 6.07e-08, coef. = 4.972e-06) → El ancho del lote es un predictor relevante.
+MasVnrArea (p = 0.000192, coef. = -4.073e-07) → El área de mampostería tiene una relación negativa con SalePrice.
+ExterQual (p = 0.000415, coef. = 1.291e-04) → La calidad del exterior es un factor clave.
+HeatingQC (p = 0.002198, coef. = -3.493e-05) → La calidad de la calefacción influye significativamente.
+CentralAir (p = 2.85e-12, coef. = 6.597e-04) → Tener aire acondicionado central impacta fuertemente en el precio.
+
+- Las no significativas fueron
+
+Street (p = 0.148)
+BsmtCond (p = 0.631)
+Fireplaces (p = 0.968)
+GarageType (p = 0.687)
+
+El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado
+
+```{r residuosModelo1}
+plot(modelo1)
+```
+#### Analisis
+
+Se puede ver que la varianza es constante, de hecho hay una tendencia a esta msima. Y se observa un patron en el grafico de residuales y muestra que la relacion no es completamete lineal, De hecho hay puntos de los mismos que deben analizarse porque puede ser que esto afecte la variabilidad del modelo y lo haga menos generalista. De hecho se ve en el grafico qq que no hay una tendencia lineal de los datos.  Para ello haremos un un test de lilliefors si los residuos se distribuyen normalmente.  
+```{r lilliefors residuos modelo 1}
+library(nortest)
+
+lillie.test(modelo1$residuals)
+```
+
+El p-valor es menor que 0.05 por lo que se rechaza la hipótesis nula de normalidad de los datos. Los residuos no están distribuidos normalmente.   
+
 ### 9.	Analice el modelo. Determine si hay multicolinealidad entre las variables, y cuáles son las que aportan al modelo. Haga un análisis de correlación de las características del modelo y especifique si el modelo se adapta bien a los datos. Explique si hay sobreajuste (overfitting) o no. En caso de existir sobreajuste, haga otro modelo que lo corrija. 
 
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
