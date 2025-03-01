@@ -1152,6 +1152,29 @@ lillie.test(modelo1$residuals)
 
 El p-valor es menor que 0.05 por lo que se rechaza la hipótesis nula de normalidad de los datos. Los residuos no están distribuidos normalmente.   
 
+
+Ahora lo que haremos es normalizarlos para ello realizamos el mismo procedimiento solo que ahora
+
+
+#### Normalizando los datos
+  
+Dado que hay diferencias de escala en las variables por lo que vamos a normalizar los datos y hacer un modelo para ver si resulta mejor modelo
+
+```{r normalizando train y test}
+train_normal <- as.data.frame(scale(train))
+```
+
+```{r modelo 1}
+modelo1.1<-lm(SalePrice~.,data = train_normal)
+summary(modelo1.1)
+```
+
+El modelo normalizado explica el 0.9997 de los datos.
+
+```{r}
+plot(modelo1.1)
+```
+
 ### 9.	Analice el modelo. Determine si hay multicolinealidad entre las variables, y cuáles son las que aportan al modelo. Haga un análisis de correlación de las características del modelo y especifique si el modelo se adapta bien a los datos. Explique si hay sobreajuste (overfitting) o no. En caso de existir sobreajuste, haga otro modelo que lo corrija. 
 
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
