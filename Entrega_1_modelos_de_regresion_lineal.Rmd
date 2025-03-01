@@ -1101,6 +1101,11 @@ setdiff(names(test_d), names(train))  # Debería mostrar character(0) si ya son 
 
 - Miramos la distribucion de SalesPrice
 ```{r}
+install.packages("ggcorrplot")
+install.packages("ggplot2")
+
+library(ggplot2)
+
 ggplot(train, aes(x = SalePrice)) + 
   geom_histogram(bins = 50, fill = "blue", alpha = 0.7) +
   labs(title = "Distribución de Precios de Casas", x = "Precio de Venta", y = "Frecuencia")
@@ -1154,67 +1159,7 @@ BsmtCond (p = 0.631)
 Fireplaces (p = 0.968)
 GarageType (p = 0.687)
 
-Vamos a eliminar los valores atipicos
-```{r}
-# Ajustar el modelo inicial
-modelo1 <- lm(SalePrice ~ ., data = train)
 
-# Calcular la distancia de Cook
-cooksd <- cooks.distance(modelo1)
-
-# Calcular leverage (hat values)
-hatvalues <- hatvalues(modelo1)
-
-# Definir umbrales para identificar valores atípicos influyentes
-umbral_cook <- 4 / nrow(train)  # Umbral típico para Cook’s Distance
-umbral_leverage <- 2 * mean(hatvalues)  # Umbral para leverage
-
-# Identificar índices de valores atípicos
-outliers_cook <- which(cooksd > umbral_cook)
-outliers_leverage <- which(hatvalues > umbral_leverage)
-
-# Unir ambos conjuntos de valores atípicos
-outliers_influyentes <- unique(c(outliers_cook, outliers_leverage))
-
-# Eliminar los valores atípicos influyentes
-train_sin_atipicos <- train[-outliers_influyentes, ]
-
-# Ajustar un nuevo modelo sin estos valores influyentes
-modelo_sin_atipicos <- lm(SalePrice ~ ., data = train_sin_atipicos)
-
-
-
-# Identificar y eliminar solo el outlier extremo
-outlier_adicional <- 81  
-train_sin_outlier_adicional <- train_sin_atipicos[-outlier_adicional, ]
-
-# Reajustar el modelo sin este punto
-modelo_final <- lm(SalePrice ~ ., data = train_sin_outlier_adicional)
-
-# Volver a graficar los residuos
-par(mfrow = c(1, 2))
-plot(modelo_sin_atipicos, which = 1, main = "Antes de eliminar el outlier 81")
-plot(modelo_final, which = 1, main = "Después de eliminar el outlier 81")
-par(mfrow = c(1, 1))
-
-# Resumen del nuevo modelo
-summary(modelo_final)
-
-
-# Aplicar transformación logarítmica a la variable dependiente
-train$SalePrice <- log(train$SalePrice)
-
-# Ajustar el modelo nuevamente
-modelo_log <- lm(SalePrice ~ ., data = train)
-
-# Graficar residuos para verificar mejoras
-par(mfrow = c(1, 1))
-plot(modelo_log, which = 1, main = "Residuos después de log(SalePrice)")
-
-
-
-
-```
 
 El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado
 
@@ -1313,10 +1258,16 @@ predicciones_train <- predict(modelo1, newdata = train)
 
 predicciones_test <- predict(modelo1, newdata = test_d)
 
-
 predicciones_test_original <- exp(predicciones_test)
 
+training_stepwise <- mean((predicciones_train - train$city_mpg)^2)
 
+test_mse_stepwise <- mean((predicciones_test - test$city_mpg)^2)
+
+```
+
+
+```{r}
 faltantes <- setdiff(names(train), names(test_d))
 for (col in faltantes) {
   test_d[[col]] <- NA
@@ -1326,7 +1277,6 @@ for (col in faltantes) {
 plot(test_d$SalePrice,col="blue", main="Predicciones vs valores originales")
 points(predicciones_test, col="red")
 legend(30,45,legend=c("original", "prediccion"),col=c("blue", "red"),pch=1, cex=0.8)
-
 
 
 ```
@@ -1343,10 +1293,202 @@ Al final el modelo 1 no es muy predictivo y al ver los siguientes solo estamos h
 
 Podemos ver que nuestro modelo lastimosamente si esta sobreajustado ya que su R ajustado es de 0.97 y de 1 si realizamos stepwise . Ademas que podemos ver que al predecir con los test no lo esta haciendo de la manera correcta aun cuando normalicemos , y apliquemos tecnicas para reducir datos atipicos.
 
-- Lo primero que vamos a hacer es utilizar VIF o variance inflation factor , que mide las varianzas entre las variables independientes. 
-- Un VIF > 10 indica alta multicolinealidad y la variable debería ser eliminada o transformada.
-- Un VIF entre 5 y 10 sugiere moderada multicolinealidad, por lo que se recomienda revisar.
-- Un VIF < 5 es aceptable.
+- Lo primero que vamos a hacer es usar la matriz de correlacion. 
+
+```{r}
+library(car)
+
+
+cor_matrix <- cor(train[, -which(names(train) == "SalePrice")], use = "pairwise.complete.obs")
+
+
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.6, tl.srt = 90)
+
+
+
+```
+
+
+Ahora conocemos la correlacion alta
+
+```{r}
+
+high_cor <- which(abs(cor_matrix) > 0.8, arr.ind = TRUE)
+
+
+high_cor <- high_cor[high_cor[,1] != high_cor[,2], ]
+print(high_cor)
+```
+
+Como podemos ver estas variables estan causando alta coinealidad de hecho podemos graficarlas con una matriz de correlacion
+
+```{r}
+
+top_vars <- c("LogSalePrice", "Qual_LivArea", "GarageYrBlt", "Age", "Exterior2nd", 
+              "Exterior1st", "X1stFlrSF", "TotalBsmtSF", "TotRmsAbvGrd", "SizeGroup", 
+              "GrLivArea", "YearBuilt", "OverallQual")
+
+
+filtered_train <- train[, top_vars]
+
+
+cor_matrix_filtered <- cor(filtered_train, use = "pairwise.complete.obs")
+
+
+library(corrplot)
+corrplot(cor_matrix_filtered, method = "color", type = "upper",
+         tl.cex = 0.8, tl.srt = 45,
+         col = colorRampPalette(c("blue", "white", "red"))(200),
+         cl.cex = 0.8)
+
+
+```
+
+
+
+Pero antes de eliminar variables multicolineales vamos a hacer una cosa. Utilizaremos Ridge y regularicemos para ver que tan bien rinden.
+
+```{r}
+
+x_train <- model.matrix(SalePrice~., data = train)
+y_train <- train$SalePrice
+
+x_test <- model.matrix(SalePrice~., data = test_d)
+y_test <- test_d$SalePrice
+
+```
+
+```{r}
+# Asegurar que ambos tengan las mismas filas
+
+
+
+set.seed(123)  # Para reproducibilidad
+indices <- sample(1:nrow(x_train), 1064)  # Seleccionar 1064 índices aleatorios
+
+x_train <- x_train[indices, ]  # Filtrar filas de x_train
+y_train <- y_train[indices]  # Filtrar elementos de y_train
+
+
+
+# Variables en train y test
+vars_train <- colnames(x_train)
+vars_test <- colnames(x_test)
+
+# Variables que están en test pero no en train
+extra_vars_in_test <- setdiff(vars_test, vars_train)
+print(extra_vars_in_test)
+x_test <- x_test[, colnames(x_train)]
+
+
+```
+
+Se hace la regularización con un 100 números de λ porque no sabemos cual es el lambda adecuado.
+```{r}
+library(tidyverse)
+library(glmnet)
+modelo3 <- glmnet(
+            x           = x_train,
+            y           = y_train,
+            alpha       = 0,
+            nlambda     = 100,
+            standardize = TRUE
+          )
+
+regularizacion <- modelo3$beta %>% 
+                  as.matrix() %>%
+                  t() %>% 
+                  as_tibble() %>%
+                  mutate(lambda = modelo3$lambda)
+
+regularizacion <- regularizacion %>%
+                   pivot_longer(
+                     cols = !lambda, 
+                     names_to = "predictor",
+                     values_to = "coeficientes"
+                   )
+```
+ Ahora graficamos loos coeficientes
+ 
+```{r}
+ regularizacion %>%
+  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
+  geom_line() +
+  labs(title = "Coeficientes del modelo en función de la regularización") +
+  theme_bw() +
+  theme(legend.position = "none")
+ 
+```
+ 
+#### Analisis
+
+Como podemos ver el valor de lambda indica que mientras mas pequeños los coeficientes mayor es lambda y mientras mas grande los coeficientes mayor el lambda.
+
+
+Ahora obtendremos el valor optimo de este con la validacion cruzada
+
+```{r}
+cv_error <- cv.glmnet(
+              x      = x_train,
+              y      = y_train,
+              alpha  = 0,
+              nfolds = 10,
+              type.measure = "mse",
+              standardize  = TRUE
+           )
+
+plot(cv_error)
+
+lambda_opt <- cv_error$lambda.min
+print(lambda_opt)
+```
+
+Vemos que el valor es de 26.461 asi que con estos nuevos datos vamos a entrenar nuestro modelo
+
+```{r}
+modelo3 <- glmnet(
+            x           = x_train,
+            y           = y_train,
+            alpha       = 0,
+            lambda      = cv_error$lambda.1se,
+            standardize = TRUE
+          )
+```
+
+Ahora vemos los predictores y sus coeficientes. Ridge no elimina variables 
+
+```{r}
+coef(modelo3)
+ 
+```
+```{r}
+
+
+
+predicciones_train_modelo3<- predict(modelo3, newx = x_train)
+
+
+predicciones_test_modelo3 <- predict(modelo3, newx = x_test)
+
+
+
+y_test <- y_test[1:nrow(x_test)]
+
+# MSE de test
+test_mse_ridge_modelo3 <- mean((predicciones_test_modelo3 - y_test)^2)
+
+# MSE de entrenamiento
+training_mse_ridge_modelo3 <- mean((predicciones_train_modelo3 - y_train)^2)
+
+
+print(test_mse_ridge_modelo3)
+print(training_mse_ridge_modelo3)
+``` 
+#### Analisis
+
+Ridge muestra que el modelo quedo bastante bien, aunque puede ser no muy bueno debido a que uno muy bajo indica sobreajuste.
+
 
 
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
