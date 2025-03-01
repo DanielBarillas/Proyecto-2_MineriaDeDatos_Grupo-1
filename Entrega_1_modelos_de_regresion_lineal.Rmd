@@ -1071,6 +1071,8 @@ Este modelo es un punto de partida, pero un modelo multivariable será más prec
 
 ```{r}
 
+
+train <- read.csv("./train_set.csv")
 train[] <- lapply(train, function(x) {
   if (is.factor(x) || is.character(x)) {
     as.numeric(as.factor(x))
@@ -1080,8 +1082,21 @@ train[] <- lapply(train, function(x) {
 })
 
 
-head(train)
 
+
+test_d <- read.csv("./test_set.csv")
+
+
+test_d[] <- lapply(test_d, function(x) {
+  if (is.factor(x) || is.character(x)) {
+    as.numeric(as.factor(x))
+  } else {
+    x  
+  }
+})
+
+setdiff(names(train), names(test_d))  # Debería mostrar character(0) si ya son iguales
+setdiff(names(test_d), names(train))  # Debería mostrar character(0) si ya son iguales
 ```
 
 - Miramos la distribucion de SalesPrice
@@ -1094,6 +1109,7 @@ ggplot(train, aes(x = SalePrice)) +
 - Aplicamos logaritmo para quitar el sesgo
 ```{r}
 train$SalePrice <- log(train$SalePrice)
+test_d$SalePrice<- log(test_d$SalePrice)
 ggplot(train, aes(x = SalePrice)) +
   geom_histogram(bins = 50, fill = "red", alpha = 0.7) +
   labs(title = "Distribución Logarítmica de los Precios", x = "Log(Precio)", y = "Frecuencia")
@@ -1105,6 +1121,8 @@ ggplot(train, aes(x = SalePrice)) +
 ```{r}
 library(dplyr)
 train <- train %>% select(-any_of(c("Id", "Cluster")))
+
+test_d <- test_d %>% select(-any_of(c("Id", "Cluster")))
 
 
 modelo1 <- lm(SalePrice~.,data = train)
@@ -1136,10 +1154,72 @@ BsmtCond (p = 0.631)
 Fireplaces (p = 0.968)
 GarageType (p = 0.687)
 
+Vamos a eliminar los valores atipicos
+```{r}
+# Ajustar el modelo inicial
+modelo1 <- lm(SalePrice ~ ., data = train)
+
+# Calcular la distancia de Cook
+cooksd <- cooks.distance(modelo1)
+
+# Calcular leverage (hat values)
+hatvalues <- hatvalues(modelo1)
+
+# Definir umbrales para identificar valores atípicos influyentes
+umbral_cook <- 4 / nrow(train)  # Umbral típico para Cook’s Distance
+umbral_leverage <- 2 * mean(hatvalues)  # Umbral para leverage
+
+# Identificar índices de valores atípicos
+outliers_cook <- which(cooksd > umbral_cook)
+outliers_leverage <- which(hatvalues > umbral_leverage)
+
+# Unir ambos conjuntos de valores atípicos
+outliers_influyentes <- unique(c(outliers_cook, outliers_leverage))
+
+# Eliminar los valores atípicos influyentes
+train_sin_atipicos <- train[-outliers_influyentes, ]
+
+# Ajustar un nuevo modelo sin estos valores influyentes
+modelo_sin_atipicos <- lm(SalePrice ~ ., data = train_sin_atipicos)
+
+
+
+# Identificar y eliminar solo el outlier extremo
+outlier_adicional <- 81  
+train_sin_outlier_adicional <- train_sin_atipicos[-outlier_adicional, ]
+
+# Reajustar el modelo sin este punto
+modelo_final <- lm(SalePrice ~ ., data = train_sin_outlier_adicional)
+
+# Volver a graficar los residuos
+par(mfrow = c(1, 2))
+plot(modelo_sin_atipicos, which = 1, main = "Antes de eliminar el outlier 81")
+plot(modelo_final, which = 1, main = "Después de eliminar el outlier 81")
+par(mfrow = c(1, 1))
+
+# Resumen del nuevo modelo
+summary(modelo_final)
+
+
+# Aplicar transformación logarítmica a la variable dependiente
+train$SalePrice <- log(train$SalePrice)
+
+# Ajustar el modelo nuevamente
+modelo_log <- lm(SalePrice ~ ., data = train)
+
+# Graficar residuos para verificar mejoras
+par(mfrow = c(1, 1))
+plot(modelo_log, which = 1, main = "Residuos después de log(SalePrice)")
+
+
+
+
+```
+
 El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado
 
 ```{r residuosModelo1}
-plot(modelo1)
+plot(modelo_log)
 ```
 #### Analisis
 
@@ -1147,7 +1227,7 @@ Se puede ver que la varianza es constante, de hecho hay una tendencia a esta msi
 ```{r lilliefors residuos modelo 1}
 library(nortest)
 
-lillie.test(modelo1$residuals)
+lillie.test(modelo_log$residuals)
 ```
 
 El p-valor es menor que 0.05 por lo que se rechaza la hipótesis nula de normalidad de los datos. Los residuos no están distribuidos normalmente.   
@@ -1174,8 +1254,100 @@ El modelo normalizado explica el 0.9997 de los datos.
 ```{r}
 plot(modelo1.1)
 ```
+#### Analisis Grafico
+Parece haber una leve tendencia no lineal (curva roja), lo que indica que la relación entre las variables podría no ser completamente lineal.
+
+Los residuales tienen una varianza no constante, es posible que se requieran correcciones como regresión ponderada o transformación de variables.
+
+Se ve tambien una mejoria en el grafico q q en donde ahora vemos que sigue la curva la mayoria de variables aunque siguen habiendo varias que se desvian de la original. 
+
+Si verificamos con lillie test
+
+```{r normalidad de residuos modelo2}
+library(nortest)
+lillie.test(modelo1.1$residuals)
+```
+El pvalue sigue siendo mas pequeño a 0.05 lo que nos indica que tampoco sirvio normalizar. 
+
+
+Lo  que vamos a hacer es seleccion de predictores con stepwise.
+
+```{r stepwise}
+# Eliminar filas con valores NA
+train_clean <- na.omit(train)
+
+# Ajustar modelo con stepwise backward
+modelo2 <- step(
+    object    = lm(formula = SalePrice ~ ., data = train_clean),
+    direction = "backward",
+    scope     = list(upper = ~., lower = ~1),
+    trace     = FALSE
+)
+summary(modelo2)
+```
+
+
+Ahora vamos a ver los residuos. 
+
+```{r}
+plot(modelo2)
+```
+#### Analisis 
+
+Podemos ver que ha mejorado un poco en la manera en como se muestran los residuos, Pero siguen habiendo valores atipicos aun con eliminar varios que dijimos que con stepwise se mejoraria. 
+
+```{r normalidad de residuos modelo2}
+library(nortest)
+lillie.test(modelo2$residuals)
+```
+
+Sigue sin mejorar aun usando el stepwise. Por lo que debemos de analizar la multicolinealidad de las variables y ver cuales debemos de seleccionar. Pero antes miremos como predice este modelo
+
+```{r}
+
+
+
+
+
+predicciones_train <- predict(modelo1, newdata = train)
+
+predicciones_test <- predict(modelo1, newdata = test_d)
+
+
+predicciones_test_original <- exp(predicciones_test)
+
+
+faltantes <- setdiff(names(train), names(test_d))
+for (col in faltantes) {
+  test_d[[col]] <- NA
+}
+
+
+plot(test_d$SalePrice,col="blue", main="Predicciones vs valores originales")
+points(predicciones_test, col="red")
+legend(30,45,legend=c("original", "prediccion"),col=c("blue", "red"),pch=1, cex=0.8)
+
+
+
+```
+
+
+#### Analisis
+
+Al final el modelo 1 no es muy predictivo y al ver los siguientes solo estamos haciendo que sea menos predictivo. Por ello mismo lo que vamos a hacer es utilizar otros metodos para poder eliminar  variables y reducir nuestro overfitting del modelo. Pero antes miremos la multicolineadlidad de los datos.
+
+
+
 
 ### 9.	Analice el modelo. Determine si hay multicolinealidad entre las variables, y cuáles son las que aportan al modelo. Haga un análisis de correlación de las características del modelo y especifique si el modelo se adapta bien a los datos. Explique si hay sobreajuste (overfitting) o no. En caso de existir sobreajuste, haga otro modelo que lo corrija. 
+
+Podemos ver que nuestro modelo lastimosamente si esta sobreajustado ya que su R ajustado es de 0.97 y de 1 si realizamos stepwise . Ademas que podemos ver que al predecir con los test no lo esta haciendo de la manera correcta aun cuando normalicemos , y apliquemos tecnicas para reducir datos atipicos.
+
+- Lo primero que vamos a hacer es utilizar VIF o variance inflation factor , que mide las varianzas entre las variables independientes. 
+- Un VIF > 10 indica alta multicolinealidad y la variable debería ser eliminada o transformada.
+- Un VIF entre 5 y 10 sugiere moderada multicolinealidad, por lo que se recomienda revisar.
+- Un VIF < 5 es aceptable.
+
 
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
 
