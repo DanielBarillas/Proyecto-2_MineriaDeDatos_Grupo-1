@@ -4,8 +4,9 @@ author:
   - "Pablo Daniel Barillas Moreno, Carné No. 22193"
   - "Mathew Cordero Aquino, Carné No. 22982"
 output:
+  pdf_document:
+    latex_engine: xelatex
   html_document: default
-  pdf_document: default
 date: "2025-02-02"
 header-includes:
    - \usepackage{fvextra}
@@ -17,6 +18,8 @@ repository: "https://github.com/DanielBarillas/Proyecto-2_MineriaDeDatos_Grupo-1
 [Repositorio en GitHub](https://github.com/DanielBarillas/Proyecto-2_MineriaDeDatos_Grupo-1.git)
 
 ### 1. Descargue los conjuntos de datos. 
+
+Para este punto, ya se ha realizado el proceso para descargar del sitio web: [House Prices - Advanced Regression Techniques](https://kaggle.com/competitions/house-prices-advanced-regression-techniques), la data de entrenamiento y la data de prueba, ambos extraídos desde la carpeta "house_prices_data/" en data frames llamados train_data (data de entrenamiento) y test_data (data de prueba), sin convertir automáticamente las variables categóricas en factores (stringsAsFactors = FALSE). Luego, se realiza una inspección inicial de train_data mediante tres funciones: head(train_data), que muestra las primeras filas del dataset; str(train_data), que despliega la estructura del data frame, incluyendo el tipo de cada variable; y summary(train_data), que proporciona un resumen estadístico de las variables numéricas y una descripción general de las categóricas.
 
 ```{r}
 train_data <- read.csv("house_prices_data/train.csv", stringsAsFactors = FALSE)
@@ -35,9 +38,43 @@ El objetivo de este análisis es entender la estructura de los datos, identifica
 
 El análisis exploratorio de datos (EDA) es fundamental para entender las características del dataset, identificar patrones y decidir qué variables serán útiles para la predicción del precio de las viviendas.
 
+```{r setup, include=FALSE}
+# Instalar paquetes si no están instalados
+paquetes_necesarios <- c("psych", "FactoMineR", "corrplot", "fpc", "factoextra", 
+                         "PCAmixdata", "paran", "dplyr", "ggplot2", "tidyr", 
+                         "nortest", "cluster", "caret", "glmnet", "car", "ggcorrplot")
+
+paquetes_faltantes <- paquetes_necesarios[!(paquetes_necesarios %in% installed.packages()[,"Package"])]
+
+if(length(paquetes_faltantes) > 0) {
+  install.packages(paquetes_faltantes, dependencies = TRUE)
+}
+
+# Cargar librerías necesarias
+library(psych)
+library(FactoMineR)
+library(fpc)
+library(factoextra)
+library(corrplot)
+library(PCAmixdata)
+library(paran)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(nortest)
+library(cluster)
+library(caret)
+library(glmnet)
+library(car)
+library(ggcorrplot)
+
+# Configuración de knitr para suprimir mensajes y advertencias
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
 2.1. Cargar y Revisar los Datos...
 
-Primero, cargamos los datos e instalamos y cargamos las librerías necesarias y revisamos su estructura.
+Primero cargamos los datos y cargamos las librerías necesarias y revisamos su estructura.
 
 ```{r}
 # Cargar librerías
@@ -176,6 +213,9 @@ log(SalePrice)
 Para entender qué variables influyen más en el precio de las casas, veamos la correlación de variables numéricas.
 
 ```{r}
+# Cargar librería
+library(dplyr)
+
 # Seleccionar solo variables numéricas
 numeric_vars <- train_data %>% select_if(is.numeric)
 
@@ -216,6 +256,7 @@ ggplot(train_data, aes(x = GrLivArea, y = SalePrice)) +
   geom_smooth(method = "lm", col = "red") +
   labs(title = "Área vs Precio", x = "Área habitable", y = "Precio")
 ```
+
 Hallazgos
 
 - Se observan dos puntos con GrLivArea > 4000 y precios muy bajos.
@@ -665,11 +706,11 @@ El gráfico de clustering muestra tres grupos diferenciados en el dataset de pre
 3. Tamaño de la Casa (GrLivArea) y su Influencia en el Precio
 El área habitable de una casa (GrLivArea) es otro factor clave para determinar su valor. El análisis de grupos basado en el tamaño de las viviendas mostró una clara relación entre el área total y el precio de venta, aunque con cierta variabilidad.
 
-- Casas grandes (GrLivArea ≥ 2000 m²): Estas viviendas tienen los precios más altos, pero con una mayor dispersión en los valores. Esto sugiere que otros factores como la ubicación y la calidad de construcción pueden influir significativamente en su valoración.
+- Casas grandes (GrLivArea ≥ 2000 m^2): Estas viviendas tienen los precios más altos, pero con una mayor dispersión en los valores. Esto sugiere que otros factores como la ubicación y la calidad de construcción pueden influir significativamente en su valoración.
 
-- Casas medianas (1000 ≤ GrLivArea < 2000 m²): Representan la mayor parte del dataset y muestran una distribución amplia de precios. En este grupo, la influencia de otros factores como el vecindario y la calidad de los acabados es más evidente.
+- Casas medianas (1000 ≤ GrLivArea < 2000 m^2): Representan la mayor parte del dataset y muestran una distribución amplia de precios. En este grupo, la influencia de otros factores como el vecindario y la calidad de los acabados es más evidente.
 
-- Casas pequeñas (GrLivArea < 1000 m²): Son las de menor precio y presentan menos variabilidad en los valores de venta, lo que indica que hay menos margen para variaciones de precio en función de otros factores.
+- Casas pequeñas (GrLivArea < 1000 m^2): Son las de menor precio y presentan menos variabilidad en los valores de venta, lo que indica que hay menos margen para variaciones de precio en función de otros factores.
 
 - Conclusión: Aunque el tamaño de la casa es un fuerte predictor del precio de venta, no es el único determinante. Casas de mayor tamaño tienden a costar más, pero la calidad de construcción y la ubicación pueden hacer que algunas casas pequeñas sean más valiosas que otras más grandes.
 
@@ -735,6 +776,7 @@ cat("Tamaño del conjunto de prueba:", nrow(test_set), "\n")  # 292 registros
 write.csv(train_set, "train_set.csv", row.names = FALSE)
 write.csv(test_set, "test_set.csv", row.names = FALSE)
 ```
+
 Validación de la División
 
 Para confirmar que la distribución de SalePrice es similar en ambos conjuntos, generamos histogramas:
@@ -749,6 +791,7 @@ ggplot(test_set, aes(x = SalePrice)) +
   geom_histogram(bins = 50, fill = "red", alpha = 0.5) +
   labs(title = "Distribución de Precios en Prueba")
 ```
+
 Conclusiones sobre la División del Conjunto de Datos
 
 La partición del dataset se realizó con el objetivo de garantizar que el conjunto de entrenamiento y el conjunto de prueba tengan una distribución representativa de los precios de las casas (SalePrice). Se utilizaron métodos de muestreo aleatorio estratificado para mantener el balance de los datos. A continuación, se presentan los hallazgos clave:
@@ -956,7 +999,9 @@ lm_model <- lm(SalePrice ~ OverallQual, data = train_set)
 # Resumen del modelo
 summary(lm_model)
 ```
+
 Análisis del Modelo
+
 El comando summary(lm_model) nos proporciona información clave:
 
 1. Intercepto y Coeficiente
@@ -982,6 +1027,7 @@ Análisis de Residuos..
 par(mfrow = c(2, 2))  # Crear un panel de 2x2 gráficos
 plot(lm_model)
 ```
+
 ¿Qué buscamos en los residuos?
 
 - Normalidad: El gráfico Q-Q debe seguir una línea recta.
@@ -1004,6 +1050,7 @@ ggplot(train_set, aes(x = OverallQual, y = SalePrice)) +
        x = "Calidad General de Construcción (OverallQual)",
        y = "Precio de Venta (SalePrice)")
 ```
+
 ¿Qué muestra este gráfico?
 
 - La relación entre OverallQual y SalePrice (si es lineal y creciente).
@@ -1024,11 +1071,13 @@ ggplot(test_set, aes(x = SalePrice, y = Predicted_SalePrice)) +
        x = "Precio Real",
        y = "Precio Predicho")
 ```
+
 Análisis de Resultados del Modelo Univariado de Regresión Lineal
 
 - La gráfica muestra la relación entre el precio real (SalePrice) y el precio predicho por el modelo utilizando OverallQual como única variable predictora.
 
 Observaciones Clave
+
 Tendencia general positiva:
 
 - Existe una correlación positiva entre el precio real y el predicho.
@@ -1169,6 +1218,7 @@ El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver s
 ```{r residuosModelo1}
 plot(modelo1)
 ```
+
 #### Analisis
 
 Se puede ver que la varianza es constante, de hecho hay una tendencia a esta msima. Y se observa un patron en el grafico de residuales y muestra que la relacion no es completamete lineal, De hecho hay puntos de los mismos que deben analizarse porque puede ser que esto afecte la variabilidad del modelo y lo haga menos generalista. De hecho se ve en el grafico qq que no hay una tendencia lineal de los datos.  Para ello haremos un un test de lilliefors si los residuos se distribuyen normalmente.  
