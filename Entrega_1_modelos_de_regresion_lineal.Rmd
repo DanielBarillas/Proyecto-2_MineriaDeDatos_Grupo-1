@@ -1261,13 +1261,20 @@ for (col in names(test_d)) {
   test_d[[col]][is.na(test_d[[col]])] <- median(test_d[[col]], na.rm = TRUE)
 }
 
+train <- train[!is.na(train$SalePrice), ]
+
+predicciones_train <- predict(modelo2, newdata = train)
+predicciones_test <- predict(modelo2, newdata = test_d)
+predicciones_train <- as.integer(predicciones_train)
 
 
-predicciones_train <- predict(modelo1, newdata = train)
+training_stepwise <- mean((predicciones_train - train$SalePrice)^2, na.rm = TRUE)
 
-predicciones_test <- predict(modelo1, newdata = test_d)
+test_mse_stepwise <- mean((predicciones_test - test_d$SalePrice)^2, na.rm = TRUE)
 
-predicciones_test_original <- exp(predicciones_test)
+
+print(training_stepwise)
+print(test_mse_stepwise)
 
 
 ```
@@ -1644,13 +1651,114 @@ training_mse_lasso_modelo4 <- mean((predicciones_train_modelo4 - y_train)^2)
 print(test_mse_lasso_modelo4 )
 print(training_mse_lasso_modelo4 )
 ``` 
+
+
+
 #### Analisis
 
 Podemos ver que realmente no cambio nada de los valores que se detectaron al inicio , asi que vamos ahora a mostrarlos en un grafico que demuestre la diferencia entre los modelos.
 
 
 
+```{r}
+
+
+# Calcular residuos
+residuos_train <- y_train - predicciones_train_modelo4
+residuos_test <- y_test - predicciones_test_modelo4
+
+
+print(test_mse_ridge_modelo3)
+print(training_mse_ridge_modelo3)
+summary(residuos_train)
+summary(residuos_test)
+
+
+par(mfrow=c(2,2))  
+
+
+hist(residuos_train, main="Histograma de residuos (Train)", 
+     col="lightblue", breaks=30, xlab="Residuos", ylab="Frecuencia")
+
+
+hist(residuos_test, main="Histograma de residuos (Test)", 
+     col="lightgreen", breaks=30, xlab="Residuos", ylab="Frecuencia")
+
+
+
+plot(predicciones_train_modelo3, residuos_train, 
+     main="Residuos vs Predicciones (Train)", 
+     xlab="Predicciones", ylab="Residuos", pch=20, col="blue")
+abline(h=0, col="red", lwd=2)
+
+
+plot(predicciones_test_modelo3, residuos_test, 
+     main="Residuos vs Predicciones (Test)", 
+     xlab="Predicciones", ylab="Residuos", pch=20, col="green")
+abline(h=0, col="red", lwd=2)
+
+# Resetear layout
+par(mfrow=c(1,1))
+
+``` 
+#### Analisis
+
+Viendo los residuos vemos el mismo patron al que utilizar Ridge lo que indica que ambos modelos son casi iguales en eficiencia. De hecho vemos que la dispersion y el histograma son exactos por lo que no es necesario llevar a cabo otros modelos. 
+
+
+
 ### 11.	Utilice cada modelo con el conjunto de prueba y determine la eficiencia del algoritmo para predecir el precio de las casas. ¿Qué tan bien lo hizo?¿Qué medidas usó para determinar la calidad de la predicción? 
 
+Como se vio anteriormente se realizo una prediccion con cada uno de los modelos tuvo un error medio cuadrado igual. Esta fue la metrica que se utilizo debido a que  el MSE permite evaluar la precisión del modelo midiendo la diferencia cuadrática media entre los valores predichos y los valores reales.
+
+El MSE es una métrica útil porque penaliza los errores grandes de manera más severa que los pequeños, lo que ayuda a identificar modelos con predicciones más precisas. Un MSE más bajo indica un mejor ajuste del modelo a los datos de entrenamiento y prueba.
+
+En retroalimentacion se puede ver que el que mejor desepeño tuvo de los 2 fue el mismo  a pesar de utilizar 2 enfoques diferenetes. 
+
+
+
 ### 12.	Discuta sobre la efectividad de los modelos. ¿Cuál lo hizo mejor? ¿Cuál es el mejor modelo para predecir el precio de las casas? Haga los gráficos que crea que le pueden ayudar en la discusión. 
+
+
+Para poder observar como fue este comportamiento vamos a ver utilizando una grafica de barras para todos los modelos
+
+
+```{r}
+df_comparacion <- data.frame(
+                    modelo = c("Stepwise", "Ridge", "Lasso"),
+                    mse    = c(test_mse_stepwise, test_mse_ridge_modelo3,
+                                test_mse_lasso_modelo4)
+)
+
+ggplot(data = df_comparacion, aes(x = modelo, y = mse)) +
+  geom_col(width = 0.5) +
+  geom_text(aes(label = round(mse, 2)), vjust = -0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+``` 
+#### Analisis
+
+Solo que utilizaremos Ridge en este caso dado los 3 modelos. Porque no utilizamos stepwise, esto se debe a que estamos hablando cuando tenemos el mse es muy bajo osea tendiendo a 0 tenemos un sobreajuste, esto ya lo habiamos discutido y de hecho con los residuos , y como queremos seguir conservando los resultados mas posibles entonces Ridge va a ser el que vamos a elegir en ves de Lasso, ya que Lasso elimino una gran parte de las variables solo dejando 2 . 
+
+
+En la siguiente gráfica vemos como quedarían las predicciones de acuerdo con los valores originales.
+
+```{r}
+plot(test_d$SalePrice,col="blue", main="Predicciones vs valores originales")
+points(predicciones_test_modelo3, col="red")
+legend(30,45,legend=c("original", "prediccion"),col=c("blue", "red"),pch=1, cex=0.8)
+``` 
+#### Analisis
+Como podemos ver la linea es la prediccion del modelo. Lo cual indica una tendencia lineal del mismo y la mayoria de los datos reales rodean al modelo lo mas cercano posible. Como mejoras serian hacer una generalizacion de los mismos ya que aqui en este no hay tanta generalizacion como se vio en el error mse.
+
+
+
+
+### Conclusiones
+
+
+Como conclusiones podemos ver que el modelo multilineal elegiremos el dado por Ridge debido a que guarda la mayor parte de las variables  y no reduce la dimensionalidad. En cambio Lasso elimina casi todas , y Stepwise es demasiado ajustado por lo que no permite generalizacion. 
+
+
+
 
