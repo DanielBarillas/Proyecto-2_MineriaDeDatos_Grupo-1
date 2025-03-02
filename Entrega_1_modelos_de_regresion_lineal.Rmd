@@ -40,8 +40,6 @@ El análisis exploratorio de datos (EDA) es fundamental para entender las caract
 Primero, cargamos los datos e instalamos y cargamos las librerías necesarias y revisamos su estructura.
 
 ```{r}
-# Instalar paquetes si no están instalados
-
 # Cargar librerías
 library(tidyverse)
 library(corrplot)
@@ -95,10 +93,11 @@ Algunas variables que podrían influir en el precio de una casa incluyen:
 - Variables como Alley, PoolQC, Fence, MiscFeature, FireplaceQu tienen muchos valores faltantes (más del 80%).
 - Otras variables como LotFrontage, GarageYrBlt, MasVnrArea, BsmtQual, BsmtCond, BsmtExposure también tienen valores faltantes, pero en menor cantidad.
 
-- Conclusión:
-Variables con más del 80% de valores faltantes deben eliminarse (PoolQC, MiscFeature, Alley, Fence, FireplaceQu).
-Valores faltantes en variables numéricas pueden imputarse con la mediana (LotFrontage).
-Valores faltantes en variables categóricas deben reemplazarse por "None" (GarageType, BsmtQual, etc.).
+Conclusión:
+
+- Variables con más del 80% de valores faltantes deben eliminarse (PoolQC, MiscFeature, Alley, Fence, FireplaceQu).
+- Valores faltantes en variables numéricas pueden imputarse con la mediana (LotFrontage).
+- Valores faltantes en variables categóricas deben reemplazarse por "None" (GarageType, BsmtQual, etc.).
 
 4. Análisis de Correlación
 
@@ -428,6 +427,7 @@ ggplot(train, aes(x = QualityGroup, y = SalePrice, fill = QualityGroup)) +
   labs(title = "Distribución de Precios por Calidad de Construcción",
        x = "Grupo de Calidad", y = "Precio de Venta")
 ```
+
 Hallazgos
 
 - Las casas de calidad alta (OverallQual ≥ 8) tienen un precio significativamente mayor.
@@ -449,6 +449,7 @@ neighborhood_summary <- train %>%
 
 print(neighborhood_summary)
 ```
+
 Hallazgos
 
 - Los vecindarios más caros son "StoneBr", "NridgHt", "NoRidge", con precios promedio por encima de 300,000 dólares.
@@ -1125,7 +1126,6 @@ ggplot(train, aes(x = SalePrice)) +
   labs(title = "Distribución Logarítmica de los Precios", x = "Log(Precio)", y = "Frecuencia")
 ```
 
-
 - Ya con esto creamos nuestro modelo con todas las variables.
 
 ```{r}
@@ -1139,14 +1139,14 @@ modelo1 <- lm(SalePrice~.,data = train)
 summary(modelo1)
 ```
 
-
 #### Analisis
 
 - Podemos ver que nuestro modelo tiene un R^2 de 0.99 lo que es una muy buena señal de prediccion ya que explica el 99% de los datos.Ademas que el F stadistics indica que es altamente significativo ya que su p value es muy pequeño.
 
 - TotalBsmtSF, GrLivArea, Age estan correlacionadas con otras, y se elimino de este modelo de manera automatica.
 
-- Las variables significativas fueron 
+- Las variables significativas fueron: 
+
 OverallQual (p < 2e-16, coef. = 0.0006618) → La calidad general de la casa es el predictor más fuerte.
 1stFlrSF (p < 2e-16, coef. = 2.766e-06) → El tamaño del primer piso tiene un efecto positivo importante.
 2ndFlrSF (p < 2e-16, coef. = 2.704e-06) → El área del segundo piso también impacta en el precio.
@@ -1157,16 +1157,14 @@ ExterQual (p = 0.000415, coef. = 1.291e-04) → La calidad del exterior es un fa
 HeatingQC (p = 0.002198, coef. = -3.493e-05) → La calidad de la calefacción influye significativamente.
 CentralAir (p = 2.85e-12, coef. = 6.597e-04) → Tener aire acondicionado central impacta fuertemente en el precio.
 
-- Las no significativas fueron
+- Las no significativas fueron:
 
 Street (p = 0.148)
 BsmtCond (p = 0.631)
 Fireplaces (p = 0.968)
 GarageType (p = 0.687)
 
-
-
-El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado
+El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado.
 
 ```{r residuosModelo1}
 plot(modelo1)
@@ -1174,6 +1172,7 @@ plot(modelo1)
 #### Analisis
 
 Se puede ver que la varianza es constante, de hecho hay una tendencia a esta msima. Y se observa un patron en el grafico de residuales y muestra que la relacion no es completamete lineal, De hecho hay puntos de los mismos que deben analizarse porque puede ser que esto afecte la variabilidad del modelo y lo haga menos generalista. De hecho se ve en el grafico qq que no hay una tendencia lineal de los datos.  Para ello haremos un un test de lilliefors si los residuos se distribuyen normalmente.  
+
 ```{r lilliefors residuos modelo 1}
 library(nortest)
 
@@ -1182,13 +1181,11 @@ lillie.test(modelo1$residuals)
 
 El p-valor es menor que 0.05 por lo que se rechaza la hipótesis nula de normalidad de los datos. Los residuos no están distribuidos normalmente.   
 
-
-Ahora lo que haremos es normalizarlos para ello realizamos el mismo procedimiento solo que ahora
-
+Ahora lo que haremos es normalizarlos para ello realizamos el mismo procedimiento solo que ahora.
 
 #### Normalizando los datos
   
-Dado que hay diferencias de escala en las variables por lo que vamos a normalizar los datos y hacer un modelo para ver si resulta mejor modelo
+Dado que hay diferencias de escala en las variables por lo que vamos a normalizar los datos y hacer un modelo para ver si resulta mejor modelo.
 
 ```{r normalizando train y test}
 train_normal <- as.data.frame(scale(train))
@@ -1204,21 +1201,23 @@ El modelo normalizado explica el 0.9997 de los datos.
 ```{r}
 plot(modelo1.1)
 ```
+
 #### Analisis Grafico
+
 Parece haber una leve tendencia no lineal (curva roja), lo que indica que la relación entre las variables podría no ser completamente lineal.
 
 Los residuales tienen una varianza no constante, es posible que se requieran correcciones como regresión ponderada o transformación de variables.
 
 Se ve tambien una mejoria en el grafico q q en donde ahora vemos que sigue la curva la mayoria de variables aunque siguen habiendo varias que se desvian de la original. 
 
-Si verificamos con lillie test
+Si verificamos con lillie test.
 
 ```{r}
 library(nortest)
 lillie.test(modelo1.1$residuals)
 ```
-El pvalue sigue siendo mas pequeño a 0.05 lo que nos indica que tampoco sirvio normalizar. 
 
+El pvalue sigue siendo mas pequeño a 0.05 lo que nos indica que tampoco sirvio normalizar. 
 
 Lo  que vamos a hacer es seleccion de predictores con stepwise.
 
@@ -1236,12 +1235,12 @@ modelo2 <- step(
 summary(modelo2)
 ```
 
-
 Ahora vamos a ver los residuos. 
 
 ```{r}
 plot(modelo2)
 ```
+
 #### Analisis 
 
 Podemos ver que ha mejorado un poco en la manera en como se muestran los residuos, Pero siguen habiendo valores atipicos aun con eliminar varios que dijimos que con stepwise se mejoraria. 
@@ -1251,7 +1250,7 @@ library(nortest)
 lillie.test(modelo2$residuals)
 ```
 
-Sigue sin mejorar aun usando el stepwise. Por lo que debemos de analizar la multicolinealidad de las variables y ver cuales debemos de seleccionar. Pero antes miremos como predice este modelo
+Sigue sin mejorar aun usando el stepwise. Por lo que debemos de analizar la multicolinealidad de las variables y ver cuales debemos de seleccionar. Pero antes miremos como predice este modelo.
 
 ```{r}
 
@@ -1294,13 +1293,9 @@ legend(30,45,legend=c("original", "prediccion"),col=c("blue", "red"),pch=1, cex=
 
 ```
 
-
 #### Analisis
 
 Al final el modelo 1 no es muy predictivo y al ver los siguientes solo estamos haciendo que sea menos predictivo. Por ello mismo lo que vamos a hacer es utilizar otros metodos para poder eliminar  variables y reducir nuestro overfitting del modelo. Pero antes miremos la multicolineadlidad de los datos.
-
-
-
 
 ### 9.	Analice el modelo. Determine si hay multicolinealidad entre las variables, y cuáles son las que aportan al modelo. Haga un análisis de correlación de las características del modelo y especifique si el modelo se adapta bien a los datos. Explique si hay sobreajuste (overfitting) o no. En caso de existir sobreajuste, haga otro modelo que lo corrija. 
 
@@ -1322,8 +1317,7 @@ corrplot(cor_matrix, method = "color", tl.cex = 0.6, tl.srt = 90)
 
 ```
 
-
-Ahora conocemos la correlacion alta
+Ahora conocemos la correlacion alta.
 
 ```{r}
 
@@ -1357,8 +1351,6 @@ corrplot(cor_matrix_filtered, method = "color", type = "upper",
 
 
 ```
-
-
 
 Pero antes de eliminar variables multicolineales vamos a hacer una cosa. Utilizaremos Ridge y regularicemos para ver que tan bien rinden.
 
@@ -1398,6 +1390,7 @@ x_test <- x_test[, colnames(x_train)]
 ```
 
 Se hace la regularización con un 100 números de λ porque no sabemos cual es el lambda adecuado.
+
 ```{r}
 library(tidyverse)
 library(glmnet)
@@ -1498,11 +1491,10 @@ training_mse_ridge_modelo3 <- mean((predicciones_train_modelo3 - y_train)^2)
 print(test_mse_ridge_modelo3)
 print(training_mse_ridge_modelo3)
 ``` 
+
 #### Analisis
 
 Ridge muestra que el modelo quedo bastante bien, aunque puede ser no muy bueno debido a que uno muy bajo indica sobreajuste. Pero sabemos por teoria que Ridge solo elimina sobreajuste acercando valores a 0 pero no eliminandolos que es lo que vimos en el grafico de los lambdas encontrados. 
-
-
 
 ```{r}
 
@@ -1559,10 +1551,7 @@ par(mfrow=c(1,1))
 
 Podemos ver que a diferencia del anterior que habiamos hecho con Stepwise ahora si vemos que los residuos ya no tienen un patron o forma clara. Lo que indica que el modelo esta haciendo buena estimacion de los valores que deberia tener. Lo que indica que podria ser un muy buen modelo . Aunque se puede ver que el histograma de Residuos esta sesgado a la derecha , posiblemente estamos viendo un valor atipico a la izquierda. O un desbalance de nuestras predicciones en test.
 
-
-
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
-
 
 Viendo en stepwise y al normalizar si hay sobreajuste asi que vamos a realizar Lazz y vamos a eliminar aquellas que sean peores predictoras o que no estan aportando a la prediccion de resultados. 
 
@@ -1597,6 +1586,7 @@ regularizacion %>%
   theme_bw() +
   theme(legend.position = "none")
 ``` 
+
 #### Analisis
 Este grafico indica lo mismo que con Ridge solo que vemos que en muy pocos valores de lambda estamos viendo que los coeficientes bajen abruptamente . 
 
@@ -1621,7 +1611,6 @@ print(lambda_opt)
 
 Vemos que el valor mas optimo sigue siendo el mismo que el anterior de 26 de hecho hasta podemos ver que con respecto a los coeficientes no cambia tanto.
 
-
 ```{r}
 modelo4 <- glmnet(
             x           = x_train,
@@ -1632,7 +1621,6 @@ modelo4 <- glmnet(
           )
 coef(modelo4)
 ``` 
-
 
 Al final solo  nos quedamos con 2 esto es normal para este tipo de seleccion de variables
 
@@ -1652,13 +1640,9 @@ print(test_mse_lasso_modelo4 )
 print(training_mse_lasso_modelo4 )
 ``` 
 
-
-
 #### Analisis
 
 Podemos ver que realmente no cambio nada de los valores que se detectaron al inicio , asi que vamos ahora a mostrarlos en un grafico que demuestre la diferencia entre los modelos.
-
-
 
 ```{r}
 
@@ -1701,11 +1685,10 @@ abline(h=0, col="red", lwd=2)
 par(mfrow=c(1,1))
 
 ``` 
+
 #### Analisis
 
 Viendo los residuos vemos el mismo patron al que utilizar Ridge lo que indica que ambos modelos son casi iguales en eficiencia. De hecho vemos que la dispersion y el histograma son exactos por lo que no es necesario llevar a cabo otros modelos. 
-
-
 
 ### 11.	Utilice cada modelo con el conjunto de prueba y determine la eficiencia del algoritmo para predecir el precio de las casas. ¿Qué tan bien lo hizo?¿Qué medidas usó para determinar la calidad de la predicción? 
 
@@ -1715,13 +1698,9 @@ El MSE es una métrica útil porque penaliza los errores grandes de manera más 
 
 En retroalimentacion se puede ver que el que mejor desepeño tuvo de los 2 fue el mismo  a pesar de utilizar 2 enfoques diferenetes. 
 
-
-
 ### 12.	Discuta sobre la efectividad de los modelos. ¿Cuál lo hizo mejor? ¿Cuál es el mejor modelo para predecir el precio de las casas? Haga los gráficos que crea que le pueden ayudar en la discusión. 
 
-
 Para poder observar como fue este comportamiento vamos a ver utilizando una grafica de barras para todos los modelos
-
 
 ```{r}
 df_comparacion <- data.frame(
@@ -1736,6 +1715,7 @@ ggplot(data = df_comparacion, aes(x = modelo, y = mse)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ``` 
+
 #### Analisis
 
 Solo que utilizaremos Ridge en este caso dado los 3 modelos. Porque no utilizamos stepwise, esto se debe a que estamos hablando cuando tenemos el mse es muy bajo osea tendiendo a 0 tenemos un sobreajuste, esto ya lo habiamos discutido y de hecho con los residuos , y como queremos seguir conservando los resultados mas posibles entonces Ridge va a ser el que vamos a elegir en ves de Lasso, ya que Lasso elimino una gran parte de las variables solo dejando 2 . 
@@ -1748,17 +1728,50 @@ plot(test_d$SalePrice,col="blue", main="Predicciones vs valores originales")
 points(predicciones_test_modelo3, col="red")
 legend(30,45,legend=c("original", "prediccion"),col=c("blue", "red"),pch=1, cex=0.8)
 ``` 
+
 #### Analisis
+
 Como podemos ver la linea es la prediccion del modelo. Lo cual indica una tendencia lineal del mismo y la mayoria de los datos reales rodean al modelo lo mas cercano posible. Como mejoras serian hacer una generalizacion de los mismos ya que aqui en este no hay tanta generalizacion como se vio en el error mse.
-
-
-
 
 ### Conclusiones
 
-
 Como conclusiones podemos ver que el modelo multilineal elegiremos el dado por Ridge debido a que guarda la mayor parte de las variables  y no reduce la dimensionalidad. En cambio Lasso elimina casi todas , y Stepwise es demasiado ajustado por lo que no permite generalizacion. 
 
+Conclusiones del Análisis de Clustering
 
+El análisis de clustering nos permitió segmentar las casas en tres grupos distintos, proporcionando información clave sobre cómo las características físicas y estructurales afectan el precio de las viviendas.
 
+1️. Interpretación General del Clustering
 
+El algoritmo de K-Means clasificó las casas en tres clusters basados en calidad de construcción, tamaño y precio:
+
+Cluster 1 (Rojo - Casas de Bajo Precio)
+
+- Baja calidad de construcción (OverallQual bajo).
+- Tamaño reducido en área habitable (GrLivArea pequeño) y sótano (TotalBsmtSF pequeño).
+- Garaje pequeño o inexistente (GarageCars cercano a 0 o 1).
+- Ubicadas en vecindarios de menor costo.
+- Presentan los precios más bajos, lo que indica que su valor es más estable y menos dependiente de otros factores.
+
+Cluster 2 (Azul - Casas de Precio Medio)
+
+- Calidad media a alta (OverallQual entre 5 y 7).
+- Tamaño intermedio con áreas habitables y sótanos de tamaño moderado.
+- Garaje con espacio para 1 o 2 autos.
+- Representan la mayoría del dataset, lo que sugiere que es el segmento más común en el mercado.
+- Precio en el rango medio con variabilidad en función de la ubicación y otros factores.
+
+Cluster 3 (Verde - Casas de Lujo)
+
+- Alta calidad de construcción (OverallQual > 7).
+- Casas grandes con un área habitable amplia (GrLivArea grande).
+- Garajes espaciosos (2-3 autos).
+- Se encuentran en vecindarios de mayor prestigio.
+- Tienen los precios más altos y muestran una dispersión significativa, lo que sugiere que otros factores como la ubicación y los acabados afectan su precio.
+
+2. Hallazgos Clave
+
+- El clustering confirma que el precio de una casa está altamente influenciado por su tamaño y calidad de construcción.
+- Los tres grupos presentan diferencias claras, lo que confirma que segmentar los datos ayuda a comprender mejor el comportamiento de los precios de las casas.
+- El Cluster 1 (rojo) tiene casas alejadas del grupo principal, lo que sugiere posibles valores atípicos o características únicas.
+- El Cluster 3 (verde) muestra una mayor dispersión, lo que indica que en casas de alto costo, factores como ubicación y acabados juegan un rol crucial en la determinación del precio.
