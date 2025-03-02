@@ -1101,8 +1101,13 @@ setdiff(names(test_d), names(train))  # Debería mostrar character(0) si ya son 
 
 - Miramos la distribucion de SalesPrice
 ```{r}
-install.packages("ggcorrplot")
-install.packages("ggplot2")
+paquetes_necesarios <- c("ggcorrplot", "ggplot2")
+
+paquetes_faltantes <- paquetes_necesarios[!(paquetes_necesarios %in% installed.packages()[,"Package"])]
+
+if(length(paquetes_faltantes) > 0) {
+  install.packages(paquetes_faltantes, dependencies = TRUE)
+}
 
 library(ggplot2)
 
@@ -1164,7 +1169,7 @@ GarageType (p = 0.687)
 El problema de nuestro modelo es que es muy sobreajustado. Asi que vamos a ver si esta sobreajustado
 
 ```{r residuosModelo1}
-plot(modelo_log)
+plot(modelo1)
 ```
 #### Analisis
 
@@ -1172,7 +1177,7 @@ Se puede ver que la varianza es constante, de hecho hay una tendencia a esta msi
 ```{r lilliefors residuos modelo 1}
 library(nortest)
 
-lillie.test(modelo_log$residuals)
+lillie.test(modelo1$residuals)
 ```
 
 El p-valor es menor que 0.05 por lo que se rechaza la hipótesis nula de normalidad de los datos. Los residuos no están distribuidos normalmente.   
@@ -1208,7 +1213,7 @@ Se ve tambien una mejoria en el grafico q q en donde ahora vemos que sigue la cu
 
 Si verificamos con lillie test
 
-```{r normalidad de residuos modelo2}
+```{r}
 library(nortest)
 lillie.test(modelo1.1$residuals)
 ```
@@ -1251,6 +1256,10 @@ Sigue sin mejorar aun usando el stepwise. Por lo que debemos de analizar la mult
 ```{r}
 
 
+test_d[is.na(test_d)] <- 0  
+for (col in names(test_d)) {
+  test_d[[col]][is.na(test_d[[col]])] <- median(test_d[[col]], na.rm = TRUE)
+}
 
 
 
@@ -1260,9 +1269,6 @@ predicciones_test <- predict(modelo1, newdata = test_d)
 
 predicciones_test_original <- exp(predicciones_test)
 
-training_stepwise <- mean((predicciones_train - train$city_mpg)^2)
-
-test_mse_stepwise <- mean((predicciones_test - test$city_mpg)^2)
 
 ```
 
@@ -1487,11 +1493,162 @@ print(training_mse_ridge_modelo3)
 ``` 
 #### Analisis
 
-Ridge muestra que el modelo quedo bastante bien, aunque puede ser no muy bueno debido a que uno muy bajo indica sobreajuste.
+Ridge muestra que el modelo quedo bastante bien, aunque puede ser no muy bueno debido a que uno muy bajo indica sobreajuste. Pero sabemos por teoria que Ridge solo elimina sobreajuste acercando valores a 0 pero no eliminandolos que es lo que vimos en el grafico de los lambdas encontrados. 
+
+
+
+```{r}
+
+predicciones_train_modelo3 <- predict(modelo3, newx = x_train)
+predicciones_test_modelo3 <- predict(modelo3, newx = x_test)
+
+
+y_test <- y_test[1:nrow(x_test)]
+
+# Calcular MSE
+test_mse_ridge_modelo3 <- mean((predicciones_test_modelo3 - y_test)^2)
+training_mse_ridge_modelo3 <- mean((predicciones_train_modelo3 - y_train)^2)
+
+# Calcular residuos
+residuos_train <- y_train - predicciones_train_modelo3
+residuos_test <- y_test - predicciones_test_modelo3
+
+
+print(test_mse_ridge_modelo3)
+print(training_mse_ridge_modelo3)
+summary(residuos_train)
+summary(residuos_test)
+
+
+par(mfrow=c(2,2))  
+
+
+hist(residuos_train, main="Histograma de residuos (Train)", 
+     col="lightblue", breaks=30, xlab="Residuos", ylab="Frecuencia")
+
+
+hist(residuos_test, main="Histograma de residuos (Test)", 
+     col="lightgreen", breaks=30, xlab="Residuos", ylab="Frecuencia")
+
+
+
+plot(predicciones_train_modelo3, residuos_train, 
+     main="Residuos vs Predicciones (Train)", 
+     xlab="Predicciones", ylab="Residuos", pch=20, col="blue")
+abline(h=0, col="red", lwd=2)
+
+
+plot(predicciones_test_modelo3, residuos_test, 
+     main="Residuos vs Predicciones (Test)", 
+     xlab="Predicciones", ylab="Residuos", pch=20, col="green")
+abline(h=0, col="red", lwd=2)
+
+# Resetear layout
+par(mfrow=c(1,1))
+
+``` 
+
+#### Analisis
+
+Podemos ver que a diferencia del anterior que habiamos hecho con Stepwise ahora si vemos que los residuos ya no tienen un patron o forma clara. Lo que indica que el modelo esta haciendo buena estimacion de los valores que deberia tener. Lo que indica que podria ser un muy buen modelo . Aunque se puede ver que el histograma de Residuos esta sesgado a la derecha , posiblemente estamos viendo un valor atipico a la izquierda. O un desbalance de nuestras predicciones en test.
 
 
 
 ### 10.	Si tiene multicolinealidad o sobreajuste, haga un modelo con las variables que sean mejores predictoras del precio de las casas. Determine la calidad del modelo realizando un análisis de los residuos. Muéstrelo gráficamente. 
+
+
+Viendo en stepwise y al normalizar si hay sobreajuste asi que vamos a realizar Lazz y vamos a eliminar aquellas que sean peores predictoras o que no estan aportando a la prediccion de resultados. 
+
+Para lazoo necesitaremos alpha
+
+```{r}
+modelo4 <- glmnet(
+            x           = x_train,
+            y           = y_train,
+            alpha       = 1,
+            nlambda     = 100,
+            standardize = TRUE
+          )
+
+regularizacion <- modelo4$beta %>% 
+                  as.matrix() %>%
+                  t() %>% 
+                  as_tibble() %>%
+                  mutate(lambda = modelo4$lambda)
+
+regularizacion <- regularizacion %>%
+                   pivot_longer(
+                     cols = !lambda, 
+                     names_to = "predictor",
+                     values_to = "coeficientes"
+                   )
+
+regularizacion %>%
+  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
+  geom_line() +
+  labs(title = "Coeficientes del modelo en función de la regularización") +
+  theme_bw() +
+  theme(legend.position = "none")
+``` 
+#### Analisis
+Este grafico indica lo mismo que con Ridge solo que vemos que en muy pocos valores de lambda estamos viendo que los coeficientes bajen abruptamente . 
+
+
+Ahora veamos el mejor valor de lambda con validacion cruzada
+```{r}
+cv_error <- cv.glmnet(
+              x      = x_train,
+              y      = y_train,
+              alpha  = 1,
+              nfolds = 10,
+              type.measure = "mse",
+              standardize  = TRUE
+           )
+
+plot(cv_error)
+lambda_opt2 <- cv_error$lambda.min
+print(lambda_opt)
+``` 
+
+#### Analisis
+
+Vemos que el valor mas optimo sigue siendo el mismo que el anterior de 26 de hecho hasta podemos ver que con respecto a los coeficientes no cambia tanto.
+
+
+```{r}
+modelo4 <- glmnet(
+            x           = x_train,
+            y           = y_train,
+            alpha       = 1,
+            lambda      = cv_error$lambda.1se,
+            standardize = TRUE
+          )
+coef(modelo4)
+``` 
+
+
+Al final solo  nos quedamos con 2 esto es normal para este tipo de seleccion de variables
+
+```{r}
+predicciones_train_modelo4<- predict(modelo4, newx = x_train)
+
+
+predicciones_test_modelo4 <- predict(modelo4, newx = x_test)
+
+# MSE de test
+test_mse_lasso_modelo4 <- mean((predicciones_test_modelo4 - y_test)^2)
+
+# MSE de entrenamiento
+training_mse_lasso_modelo4 <- mean((predicciones_train_modelo4 - y_train)^2)
+
+print(test_mse_lasso_modelo4 )
+print(training_mse_lasso_modelo4 )
+``` 
+#### Analisis
+
+Podemos ver que realmente no cambio nada de los valores que se detectaron al inicio , asi que vamos ahora a mostrarlos en un grafico que demuestre la diferencia entre los modelos.
+
+
 
 ### 11.	Utilice cada modelo con el conjunto de prueba y determine la eficiencia del algoritmo para predecir el precio de las casas. ¿Qué tan bien lo hizo?¿Qué medidas usó para determinar la calidad de la predicción? 
 
